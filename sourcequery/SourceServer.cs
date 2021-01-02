@@ -39,10 +39,32 @@ namespace SourceQuery
 
         private readonly UdpClient _socket;
 
-        public SourceServer(IPEndPoint sourceServer)
+        public SourceServer(IPEndPoint sourceServer, int timeoutMs)
         {
             _socket = new UdpClient();
             _socket.Connect(sourceServer);
+
+            _socket.Client.ReceiveTimeout = timeoutMs;
+            _socket.Client.SendTimeout = timeoutMs;
+        }
+
+        public SourceServer(IPEndPoint sourceServer) : this(sourceServer, 5000)
+        { }
+
+        private static async Task<UdpReceiveResult> ReceiveAsync(UdpClient client)
+        {
+            return await Task.Run(() => {
+                try
+                {
+                    IPEndPoint remoteEP = null;
+                    byte[] data = client.Receive(ref remoteEP);
+                    return new UdpReceiveResult(data, remoteEP);
+                }
+                catch (SocketException)
+                {
+                    return new UdpReceiveResult();
+                }
+            });
         }
 
         public async Task<TimeSpan> Ping()
@@ -54,15 +76,15 @@ namespace SourceQuery
                 return TimeSpan.MinValue;
 
             stopwatch.Start();
-            UdpReceiveResult recvRes = await _socket.ReceiveAsync();
+            UdpReceiveResult recvRes = await ReceiveAsync(_socket);
             stopwatch.Stop();
-            return recvRes.Buffer.Length > 0 ? stopwatch.Elapsed : TimeSpan.MinValue;
+            return (recvRes.Buffer != null && recvRes.Buffer.Length > 0) ? stopwatch.Elapsed : TimeSpan.MinValue;
         }
 
         private async Task<byte[]> ReceivePacket()
         {
-            UdpReceiveResult recvRes = await _socket.ReceiveAsync();
-            if (recvRes.Buffer.Length <= 0)
+            UdpReceiveResult recvRes = await ReceiveAsync(_socket);
+            if (recvRes.Buffer == null || recvRes.Buffer.Length <= 0)
                 return null;
 
             int type = BitConverter.ToInt32(recvRes.Buffer, 0);
@@ -105,7 +127,7 @@ namespace SourceQuery
 				if (received >= numpackets)
 					break;
 
-                recvRes = await _socket.ReceiveAsync();
+                recvRes = await ReceiveAsync(_socket);
                 if (recvRes.Buffer.Length <= 0)
                     break;
 
@@ -158,7 +180,7 @@ namespace SourceQuery
                 return null;
 
             byte[] buffer = await ReceivePacket();
-            if (buffer.Length == 0)
+            if (buffer == null || buffer.Length == 0)
                 return null;
 
             using MemoryStream readerStream = new MemoryStream(buffer);
@@ -220,7 +242,7 @@ namespace SourceQuery
                 return null;
 
             byte[] buffer = await ReceivePacket();
-            if (buffer.Length < 5)
+            if (buffer == null || buffer.Length < 5)
                 return null;
 
             int code = BitConverter.ToInt32(buffer, 0);
@@ -240,7 +262,7 @@ namespace SourceQuery
                     return null;
 
                 buffer = await ReceivePacket();
-                if (buffer.Length < 5)
+                if (buffer == null || buffer.Length < 5)
                     return null;
 
                 code = BitConverter.ToInt32(buffer, 0);
