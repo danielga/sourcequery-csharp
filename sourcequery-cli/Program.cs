@@ -21,7 +21,7 @@ namespace SourceQuery.CLI
                 List<SourceServer.Rule> rules = await server.GetRules();
                 List<SourceServer.Player> players = await server.GetPlayers();
 
-                SteamAPI api = new SteamAPI(args[2]);
+                /*SteamAPI api = new SteamAPI(args[2]);
                 SteamAPI.ServerDetails[] details1 = await api.GetServerSteamIDsByIP(endpoint);
                 if (details1 != null)
                 {

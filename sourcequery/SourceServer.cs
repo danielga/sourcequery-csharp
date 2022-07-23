@@ -93,60 +93,60 @@ namespace SourceQuery
             else if (type != -2)
                 return null;
 
-			bool compressed = false;
+            bool compressed = false;
             byte numpackets = recvRes.Buffer[4 /* 0xFFFFFFFE */ + 4 /* requestID */], received = 0;
-			uint packet_checksum = 0;
+            uint packet_checksum = 0;
             int totalbytes = 0;
             byte[][] packets = new byte[numpackets][];
 
             do
-			{
+            {
                 using MemoryStream readerStream = new MemoryStream(recvRes.Buffer);
                 readerStream.Seek(4 /* 0xFFFFFFFE */, SeekOrigin.Begin);
                 using BinaryReader reader = new BinaryReader(readerStream);
 
                 int requestid = reader.ReadInt32();
 
-				numpackets = reader.ReadByte();
+                numpackets = reader.ReadByte();
                 if (numpackets != packets.Length)
                     break;
 
                 byte numpacket = reader.ReadByte();
                 short splitsize = reader.ReadInt16();
 
-				compressed = (requestid & 0x80000000) != 0;
+                compressed = (requestid & 0x80000000) != 0;
 
-				if (compressed)
-					packet_checksum = reader.ReadUInt32();
+                if (compressed)
+                    packet_checksum = reader.ReadUInt32();
 
-				int size = (int)(readerStream.Length - readerStream.Position);
-				packets[numpacket] = reader.ReadBytes(size);
+                int size = (int)(readerStream.Length - readerStream.Position);
+                packets[numpacket] = reader.ReadBytes(size);
                 totalbytes += size;
 
                 ++received;
-				if (received >= numpackets)
-					break;
+                if (received >= numpackets)
+                    break;
 
                 recvRes = await ReceiveAsync(_socket);
                 if (recvRes.Buffer.Length <= 0)
                     break;
 
                 type = BitConverter.ToInt32(recvRes.Buffer, 0);
-				Debug.Assert(type == -2);
-			}
-			while (received < numpackets);
+                Debug.Assert(type == -2);
+            }
+            while (received < numpackets);
 
             int offset = 0;
             byte[] buffer = new byte[totalbytes];
-			for (byte k = 0; k < numpackets; ++k)
+            for (byte k = 0; k < numpackets; ++k)
             {
                 byte[] section = packets[k];
                 Buffer.BlockCopy(section, 0, buffer, offset, section.Length);
                 offset += section.Length;
             }
 
-			if (compressed)
-			{
+            if (compressed)
+            {
                 {
                     using MemoryStream compressedStream = new MemoryStream(buffer, false);
                     using MemoryStream decompressedStream = new MemoryStream();
@@ -157,10 +157,10 @@ namespace SourceQuery
                 BZip2Crc crc = new BZip2Crc();
                 crc.Update(buffer);
                 if (crc.Value != packet_checksum)
-					return null;
-			}
+                    return null;
+            }
 
-			return buffer;
+            return buffer;
         }
 
         private string ReadStringFromBinaryReader(BinaryReader reader)
@@ -309,9 +309,9 @@ namespace SourceQuery
             readerStream.Seek(4 /* 0xFFFFFFFF */ + 1 /* S2A_PLAYER */, SeekOrigin.Begin);
             using BinaryReader reader = new BinaryReader(readerStream);
 
-            ushort numplayers = reader.ReadUInt16();
+            byte numplayers = reader.ReadByte();
             List<Player> players = new List<Player>();
-            for (ushort k = 0; k < numplayers; ++k)
+            for (byte k = 0; k < numplayers; ++k)
             {
                 Player player = new Player
                 {
